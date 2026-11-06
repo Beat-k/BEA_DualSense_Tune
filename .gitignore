@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+dualsense_profile.json
+dualsense_log.csv
