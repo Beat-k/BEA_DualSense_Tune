@@ -1,6 +1,6 @@
 # BEA DualSense Tune
 
-Diagnose PS5 DualSense stick drift and correct it in software. One Python file, no config.
+Diagnose PS5 DualSense stick drift and correct it in software. One Python file for the tool, one optional file for monitoring drift during a game. No config.
 
 Hands off the controller for six seconds and the tool measures each stick's resting offset, noise and slow creep. It tells you what kind of fault the numbers look like, saves a correction profile, and can send the corrected values to games through a virtual Xbox 360 pad.
 
@@ -20,6 +20,7 @@ RIGHT stick
 - A DualSense over USB or Bluetooth
 - Windows or Linux. Tested on Windows with Python 3.12, pygame 2.6.1 (SDL 2.28.4).
 - For `bridge` only: Windows, `pip install vgamepad` (which installs the ViGEmBus driver)
+- For `bea_drift_monitor.py` only: Windows. It detects the game with `tasklist` and reads the focused window title through the Windows API. On other systems the game state shows as `unknown`.
 
 ## Quick start
 
@@ -40,6 +41,7 @@ python bea_dualsense_tune.py live
 | `calibrate` | Measures resting offset, noise and creep for both sticks. Prints findings and saves `dualsense_profile.json`. `--seconds N` (default 6, at least 1), `--map`, `--out`, `--pad`. |
 | `live` | Shows raw and corrected stick values side by side using the saved profile. `--profile`, `--map`, `--pad`. |
 | `log` | Writes every sample to CSV (`dualsense_log.csv`). Also counts button and D-pad activity, which exposes ghost input. `--seconds N` (default 10, at least 1), `--out`, `--pad`. |
+| `watch` | Prints raw resting stick readings every few seconds (`--window N`, default 5) and saves `dualsense_watch.csv`. Use it hands-off to see whether anything shifts when a game or app starts. |
 | `buttons` | Prints each button index as you press it, and what `bridge` will send for it. `--pad`. |
 | `bridge` | Sends corrected values to a virtual Xbox 360 pad. `--profile`, `--map`, `--pad`. See [Using it in games](#using-it-in-games). |
 | `selftest` | Runs the math and the bridge mapping on synthetic data. No controller needed. |
@@ -93,6 +95,20 @@ Limits to know about:
 - **ViGEmBus is no longer actively developed upstream.** Check its repository for current status before depending on it.
 - **Status:** the `bridge` mapping logic is covered by `selftest`. It has not yet been tested end to end against a game. Report what you find.
 
+## Monitoring drift during a game
+
+`bea_drift_monitor.py` runs beside a game and logs the raw stick readings every few seconds, labelled by game state: `closed`, `background` or `focused`. It is read-only. It reads the controller, lists running process names, and reads the focused window's title. It does not open or touch the game.
+
+```
+python bea_drift_monitor.py                 # defaults look for Rainbow Six Siege
+python bea_drift_monitor.py --game MyGame --title "My Game"
+python bea_drift_monitor.py selftest
+```
+
+Only idle windows count as drift data: no buttons, no trigger pull, sticks steady and near center. Set the controller down now and then (loading screens, spectating) to collect them. Each idle window is compared with your saved `calibrate` profile, and a `*` marks a reading that moved 0.01 or more. Ctrl+C prints a per-state summary and saves `drift_monitor_<time>.csv`.
+
+The question it answers: does the controller's resting reading change with the game state? If it stays flat, whatever you see in game comes from the game's own input handling, not from the controller.
+
 ## Not a hardware fix
 
 If the offset grows or the jitter doesn't clean up, the stick module needs replacing. This tool measures the fault and masks it; it doesn't repair it. It also doesn't change what a PS5 console sees.
@@ -106,10 +122,13 @@ If `calibrate` reports button or D-pad activity with your hands off, check for a
 | File | Purpose |
 |---|---|
 | `bea_dualsense_tune.py` | the tool |
+| `bea_drift_monitor.py` | logs drift while a game runs (needs the tool file beside it) |
 | `LICENSE` | MIT license |
 | `CONTRIBUTING.md` | how to report issues and send changes |
 | `dualsense_profile.json` | your saved correction profile (generated) |
 | `dualsense_log.csv` | raw samples from `log` (generated) |
+| `dualsense_watch.csv` | readings from `watch` (generated) |
+| `drift_monitor_*.csv` | sessions from the drift monitor (generated) |
 
 ---
 

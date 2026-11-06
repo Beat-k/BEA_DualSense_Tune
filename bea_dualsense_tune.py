@@ -10,6 +10,8 @@ What it does
              it looks like, and saves a correction profile (JSON).
   live       Shows raw vs corrected stick values using the saved profile.
   log        Writes every sample to CSV (for your own analysis, or to catch ghost input).
+  watch      Prints raw resting stick readings every few seconds (hands off) so
+             you can see whether anything changes when a game or app starts.
   buttons    Prints button indices as you press them (to check the bridge map).
   bridge     Sends corrected values to a virtual Xbox 360 pad (needs ViGEmBus
              + `pip install vgamepad`). Games then see the corrected pad.
@@ -326,6 +328,8 @@ def cmd_selftest(_):
     assert (rx, ry, lt, rt, pr) == (0.0, 0.0, 0.0, 0.0, set()), (rx, ry, lt, rt, pr)
     _, (rx, ry), lt, rt, pr = to_x360([0, 0, 0.067, -1.0, 1.0, 0.0], [1] + [0] * 16, prof, mp)
     assert ry > 0.9 and abs(rx) < 0.05 and lt == 1.0 and abs(rt - 0.5) < 1e-9 and pr == {"A"}, (rx, ry, lt, rt, pr)
+    m = window_means([[0.1, 0.2, 0.3, 0.4], [0.3, 0.4, 0.5, 0.6]], parse_map(DEFAULT_MAP))
+    assert all(abs(x - y) < 1e-9 for x, y in zip(m, [0.2, 0.3, 0.4, 0.5])), m
     print("selftest ok:", json.dumps(res["findings"]))
 
 
@@ -430,6 +434,37 @@ def cmd_bridge(a):
         vpad.update()
 
 
+def window_means(rows, mapping):
+    """Mean raw value of lx, ly, rx, ry over one window."""
+    return [statistics.fmean(r[mapping[k]] for r in rows) for k in ("lx", "ly", "rx", "ry")]
+
+
+def cmd_watch(a):
+    mapping = parse_map(a.map)
+    pygame, pad = open_pad(a.pad)
+    print("Watching raw sticks every %d s, hands OFF. Ctrl+C to stop. CSV: %s" % (a.window, a.out))
+    print("A '*' marks a window that moved 0.01 or more from the first window.\n")
+    base = None
+    t_start = time.perf_counter()
+    with open(a.out, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["t_s", "lx", "ly", "rx", "ry", "button_samples"])
+        try:
+            while True:
+                ts, rows, activity, _ = collect(pygame, pad, a.window)
+                m = window_means(rows, mapping)
+                if base is None:
+                    base = m
+                moved = max(abs(v - b) for v, b in zip(m, base)) >= 0.01
+                t = time.perf_counter() - t_start
+                w.writerow(["%.1f" % t] + ["%.5f" % v for v in m] + [activity])
+                f.flush()
+                print("%6.0fs  L(%+.3f,%+.3f)  R(%+.3f,%+.3f)  buttons:%d %s" % (
+                    t, m[0], m[1], m[2], m[3], activity, "*" if moved else ""))
+        except KeyboardInterrupt:
+            print()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -457,6 +492,12 @@ def main():
     br.add_argument("--map", default=DEFAULT_MAP)
     br.add_argument("--pad", type=int, default=0, help="controller index (default 0)")
     br.set_defaults(fn=cmd_bridge)
+    wt = sub.add_parser("watch")
+    wt.add_argument("--window", type=positive_int, default=5, help="seconds per reading")
+    wt.add_argument("--map", default=DEFAULT_MAP)
+    wt.add_argument("--out", default="dualsense_watch.csv")
+    wt.add_argument("--pad", type=int, default=0, help="controller index (default 0)")
+    wt.set_defaults(fn=cmd_watch)
     s = sub.add_parser("selftest")
     s.set_defaults(fn=cmd_selftest)
     a = p.parse_args()

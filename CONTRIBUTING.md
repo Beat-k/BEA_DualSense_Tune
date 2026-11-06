@@ -1,6 +1,6 @@
 # Contributing to BEA DualSense Tune
 
-Thanks for helping. This is a small, single-file tool, and the goal is to keep it that way: easy to read, no config, few dependencies.
+Thanks for helping. This is a small tool made of two single-file scripts (`bea_dualsense_tune.py` and `bea_drift_monitor.py`), and the goal is to keep it that way: easy to read, no config, few dependencies.
 
 ## Useful contributions
 
@@ -23,14 +23,14 @@ Please don't attach `dualsense_log.csv` files over a few hundred rows; paste a s
 ## Making a change
 
 1. Fork the repository and create a branch.
-2. Make your change in `bea_dualsense_tune.py`.
-3. Run `python bea_dualsense_tune.py selftest`. It must pass. If you change the math or the bridge mapping, extend `selftest` to cover it.
+2. Make your change in `bea_dualsense_tune.py` or `bea_drift_monitor.py`.
+3. Run `python bea_dualsense_tune.py selftest` and `python bea_drift_monitor.py selftest`. Both must pass. If you change the math, the bridge mapping or the idle-window logic, extend the matching `selftest` to cover it.
 4. If you change a command, flag or threshold, update `README.md` in the same change.
 5. Open a pull request describing what changed and why. If you tested with a real controller, say which.
 
 ## Guidelines
 
-- Keep it one file, Python 3.9+. `pygame` is the only required dependency; `vgamepad` stays optional and only for `bridge`.
+- Keep each script a single file, Python 3.9+. The monitor may import the tool, but not the other way round. `pygame` is the only required dependency; `vgamepad` stays optional and only for `bridge`.
 - Don't add config files or required setup steps.
 - Keep the output plain and readable. Findings should say what the numbers look like, not overstate a diagnosis.
 - Don't claim a hardware fault is fixed in software. The tool measures and masks.
